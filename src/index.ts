@@ -3,9 +3,20 @@ import { Bindings } from "./env"
 import { drizzle } from "drizzle-orm/d1"
 import { projectsTable, projectToStackTable, stackTable } from "./schema"
 import * as schema from "./schema"
-import { eq, inArray } from "drizzle-orm"
+import { desc, eq, inArray } from "drizzle-orm"
+import { cors } from "hono/cors"
+import AdminController from "./admin.controller"
 const app = new Hono<{ Bindings: Bindings }>()
-
+app.use(
+	cors({
+		allowMethods: ["GET"],
+		origin: [
+			"http://localhost:5173",
+			"https://phasenull.dev",
+			"https://www.phasenull.dev"
+		]
+	})
+)
 app.get("/status", (c) => {
 	return c.json({ success: true })
 })
@@ -56,5 +67,30 @@ app.get("/projects/:id", async (c) => {
 		relations: relations
 	})
 })
+
+app.get("/social/get-recent-activities", async (c) => {
+	const db = drizzle(c.env.DB, { schema })
+	const promise_activities = db
+		.select()
+		.from(schema.activitiesTable)
+		.orderBy(desc(schema.activitiesTable.created_at))
+		.limit(100)
+	const promise_media_list = db
+		.select()
+		.from(schema.activitiesMediaTable)
+		.orderBy(desc(schema.activitiesMediaTable.created_at))
+		.limit(100)
+	const [activities, media_list] = await Promise.all(
+		[promise_activities,
+		promise_media_list]
+	)
+	return c.json({
+		success: true,
+		activity_list: activities || [],
+		media_list: media_list || []
+	})
+})
+
+app.route("/admin",AdminController)
 
 export default app
