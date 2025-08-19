@@ -35,38 +35,36 @@ export const stackTable = sqliteTable("stack", {
 	image_url: text()
 })
 
-
-export const activitiesTable = sqliteTable("activities",{
+export const activitiesTable = sqliteTable("activities", {
 	id: int().primaryKey({ autoIncrement: true }).notNull(),
 	content: text(),
 	created_at: int({ mode: "timestamp_ms" }).defaultNow(),
 	url: text(),
-	platform: text().$type<
-		"linkedin" | "youtube" | "twitter" | "other"
-	>()
+	platform: text().$type<"linkedin" | "youtube" | "twitter" | "other">()
 })
 
-export const codeChallangesTable = sqliteTable("code_challanges",{
+export const codeChallangesTable = sqliteTable("code_challanges", {
 	id: int().primaryKey({ autoIncrement: true }).notNull(),
 	secret: text().notNull(),
-	ip:text(),
+	ip: text(),
 	created_at: int({ mode: "timestamp_ms" }).defaultNow(),
 	used_at: int({ mode: "timestamp_ms" })
 })
 
-export const sessionsTable = sqliteTable("sessions",{
+export const sessionsTable = sqliteTable("sessions", {
 	id: int().primaryKey({ autoIncrement: true }).notNull(),
-	ip:text(),
+	ip: text().notNull(),
 	created_at: int({ mode: "timestamp_ms" }).defaultNow(),
-	bearer:text(),
-	account_userid:text(),
-	account_username:text()
+	bearer: text().notNull(),
+	account_userid: text().notNull(),
+	account_username: text().notNull(),
+	data: text({ mode: "json" })
 })
 
-export const activitiesMediaTable = sqliteTable("activities_media",{
+export const activitiesMediaTable = sqliteTable("activities_media", {
 	id: int().primaryKey({ autoIncrement: true }).notNull(),
-	activity_id: int().references(()=>activitiesTable.id),
+	activity_id: int().references(() => activitiesTable.id),
 	created_at: int({ mode: "timestamp_ms" }).defaultNow(),
 	url: text(),
-	type: text().$type<"image"|"video">(),
+	type: text().$type<"image" | "video">()
 })

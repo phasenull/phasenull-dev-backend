@@ -1,9 +1,9 @@
 import { drizzle } from "drizzle-orm/d1"
 import { Context } from "hono"
 import * as schema from "./schema"
-import { Bindings } from "./env"
 import { and, eq } from "drizzle-orm"
 import { verify } from "hono/jwt"
+import { CustomContext } from "./env"
 export const generateRandomString = (length: number) => {
 	const array = new Uint8Array(length)
 	crypto.getRandomValues(array)
@@ -30,7 +30,8 @@ export function buildDB(c: Context) {
 }
 
 export async function getTwitterUserFromBearer(bearer: string) {
-	const url = "https://api.x.com/2/users/me"
+
+	const url = "https://api.x.com/2/users/me?user.fields=created_at,description,connection_status,is_identity_verified,profile_banner_url,profile_image_url,protected,url,verified,verified_type,withheld"
 	const request = await fetch(url, { headers: { Authorization: bearer } })
 	const data = await request.json() as {
 		data: {
@@ -47,7 +48,7 @@ export async function getTwitterUserFromBearer(bearer: string) {
 }
 export async function getBearerFromServiceToken(
 	service_token: string,
-	c: Context<{ Bindings: Bindings }>
+	c: CustomContext
 ) {
 	let payload: { sub: number }
 	try {

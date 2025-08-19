@@ -1,12 +1,13 @@
 import { Hono } from "hono"
-import { Bindings } from "./env"
 import { drizzle } from "drizzle-orm/d1"
 import { projectsTable, projectToStackTable, stackTable } from "./schema"
 import * as schema from "./schema"
 import { desc, eq, inArray } from "drizzle-orm"
 import { cors } from "hono/cors"
 import AdminController from "./admin.controller"
-const app = new Hono<{ Bindings: Bindings }>()
+import { CustomContext } from "./env"
+import OAuthController from "./auth.controller"
+const app = new Hono<CustomContext>()
 app.use(
 	cors({
 		allowMethods: ["GET"],
@@ -21,6 +22,8 @@ app.get("/status", (c) => {
 	return c.json({ success: true })
 })
 
+app.route("/admin",AdminController)
+app.route("/oauth",OAuthController)
 app.get("/projects/search", async (c) => {
 	const stacks_raw = c.req.query("stacks")
 	if (!stacks_raw)
@@ -90,7 +93,5 @@ app.get("/social/get-recent-activities", async (c) => {
 		media_list: media_list || []
 	})
 })
-
-app.route("/admin",AdminController)
 
 export default app

@@ -1,5 +1,5 @@
 import { Hono } from "hono"
-import { Bindings } from "./env"
+import { CustomContext } from "./env"
 import {
 	buildDB,
 	generateCodeChallenge,
@@ -8,175 +8,64 @@ import {
 } from "./utils"
 import { codeChallangesTable, sessionsTable } from "./schema"
 import { sign, verify } from "hono/jwt"
-import { and, eq, isNull } from "drizzle-orm"
+import { and, desc, eq, isNull } from "drizzle-orm"
+import { AuthMiddleware } from "./auth.middleware"
 
-const AdminController = new Hono<{ Bindings: Bindings }>()
+const AdminController = new Hono<CustomContext>()
+AdminController.use("/*", AuthMiddleware)
 
-AdminController.get("/oauth/callback", async (c) => {
-	const code = c.req.query("code")
-	const state = c.req.query("state")
-	if (!(code && state))
-		return c.json(
-			{ success: false, message: "code or state parameter is missing." },
-			400
-		)
-	let verified_payload
-	try {
-		verified_payload = await verify(state, c.env.JWT_SECRET)
-	} catch (e) {
-		return c.json(
-			{ success: false, message: "request has expired or invalid." },
-			400
-		)
-	}
-	if (!verified_payload)
-		return c.json(
-			{ success: false, message: "request has expired or invalid." },
-			400
-		)
+AdminController.get("/test", async (c) => {
+	return c.json({ success: true, message: "Admin test route" })
+})
+AdminController.get("/whoami", async (c) => {
+	const payload = c.get("jwtPayload")
 	const db = buildDB(c)
-	const remote_ip = c.req.header("CF-Connecting-IP") as string
-	if (!remote_ip) return c.json({ success: false, message: "invalid ip." }, 400)
-	const secret = verified_payload.secret as number
-	const [entry] = await db
+	const [user] = await db
 		.select()
-		.from(codeChallangesTable)
-		.where(
-			and(
-				eq(codeChallangesTable.id, secret),
-				eq(codeChallangesTable.ip, remote_ip),
-				isNull(codeChallangesTable.used_at)
-			)
-		)
+		.from(sessionsTable)
+		.where(eq(sessionsTable.id, payload.sub))
 		.limit(1)
-	const form_data = new URLSearchParams()
-	form_data.set("code", code)
-	form_data.set("grant_type", "authorization_code")
-	form_data.set("client_id", c.env.TWITTER_CLIENT_ID)
-	form_data.set(
-		"redirect_uri",
-		`${c.env.PORTFOLIO_URL}` + "/admin/oauth/callback"
-	)
-	form_data.set("code_verifier", entry.secret)
-
-	const url = `https://api.x.com/2/oauth2/token?${form_data.toString()}`
-	const request = await fetch(url, {
-		headers: {
-			"Content-Type": "application/x-www-form-urlencoded"
-		},
-		// body:form_data,
-		method: "POST"
-	})
-	const response = (await request.json()) as {
-		token_type: "bearer"
-		expires_in: 7200
-		access_token: string
-		scope: "tweet.read"
+	if (!user) {
+		return c.json({ success: false, message: "User not found." }, 404)
 	}
-	if (!response.access_token)
-		return c.json(
-			{
-				success: false,
-				message: "twitter api did not return an access token"
-			},
-			400
-		)
-	if (
-		!(
-			response.scope.includes("tweet.read") &&
-			response.scope.includes("tweet.read")
-		)
-	)
-		return c.json({ success: false, message: "scope is not valid" }, 400)
-	const token = response.access_token
-	const user = await getTwitterUserFromBearer(`Bearer ${token}`)
-	if (!user)
-		return c.json(
-			{
-				success: false,
-				message:
-					"twitter /users/me request failed or did not return a valid user"
-			},
-			400
-		)
-	if (user.data.username !== c.env.TWITTER_USERNAME)
-		return c.json(
-			{
-				success: false,
-				message:
-					"You are not allowed to see this page, if you are the portfolio owner please put your twitter username with key TWITTER_USERNAME in your .env file."
-			},
-			403
-		)
-	const [result] = await db
-		.insert(sessionsTable)
-		.values({
-			bearer: token,
-			ip: remote_ip,
-			account_userid: user?.data.id,
-			account_username: user?.data.name
-		})
-		.returning()
-	const service_access_token = await sign(
-		{
-			exp: Math.floor(Date.now() / 1000) + response.expires_in,
-			sub: result.id
-		},
-		c.env.JWT_SECRET + "-JWT_SESSION"
-	)
+	if (!user) return c.json({ success: false, message: "User not found." }, 404)
+
+	// const twitter_user = await getTwitterUserFromBearer(`Bearer ${user.bearer}`)
+	// if (!twitter_user) return c.json({ success: false, message: "Twitter user not found." }, 404)
+	return c.json({ success: true, user: user.data })
+})
+AdminController.get("/list-sessions", async (c) => {
+	const page = c.req.query("page") ? Math.max(0, parseInt(c.req.query("page") as string)) : 1
+	const db = buildDB(c)
+	const sessions = await db.select().from(sessionsTable).orderBy(desc(sessionsTable.created_at)).limit(100).offset((page - 1) * 100)
+
+	// const twitter_user = await getTwitterUserFromBearer(`Bearer ${user.bearer}`)
+	// if (!twitter_user) return c.json({ success: false, message: "Twitter user not found." }, 404)
 	return c.json({
 		success: true,
-		access_token: service_access_token,
-		user: user
+		sessions: sessions.map((e) => ({
+			...e,
+			bearer: null,
+			data: { ...(e.data as any), access_token: undefined }
+		}))
 	})
 })
-AdminController.get("/oauth/authorize", async (c) => {
-	if (!c.env.JWT_SECRET)
-		return c.json(
-			{ success: false, message: "JWT_SECRET is undefined in .env" },
-			500
-		)
-	if (!(c.env.TWITTER_CLIENT_ID && c.env.TWITTER_CLIENT_SECRET))
-		return c.json(
-			{
-				success: false,
-				message:
-					"TWITTER_CLIENT_ID or TWITTER_CLIENT_SECRET is undefined in .env"
-			},
-			500
-		)
-	const new_verifier = generateRandomString(20)
+AdminController.get("/usage", async (c) => {
+	const page = c.req.query("page") ? Math.max(0, parseInt(c.req.query("page") as string)) : 1
 	const db = buildDB(c)
-	const [entry] = await db
-		.insert(codeChallangesTable)
-		.values({
-			secret: new_verifier,
-			ip: c.req.header("CF-Connecting-IP")
-		})
-		.returning()
-	const jwt = await sign(
-		{
-			iat: Math.floor(Date.now() / 1000),
-			exp: Math.floor(Date.now() / 1000) + 15 * 60,
-			secret: entry.id
-		},
-		c.env.JWT_SECRET
-	)
-	const hash = await generateCodeChallenge(new_verifier)
-	const oauth_url = new URL(`https://x.com/i/oauth2/authorize`)
-	oauth_url.searchParams.set("response_type", "code")
-	oauth_url.searchParams.set("client_id", c.env.TWITTER_CLIENT_ID)
-	oauth_url.searchParams.set(
-		"redirect_uri",
-		`https://phasenull.dev/admin/oauth/callback`
-	)
-	oauth_url.searchParams.set("scope", "tweet.read users.read")
-	oauth_url.searchParams.set("state", jwt)
-	oauth_url.searchParams.set("code_challenge", hash)
-	oauth_url.searchParams.set("code_challenge_method", "S256")
+	const [session] = await db.select().from(sessionsTable).limit(1).where(eq(sessionsTable.id, c.get("jwtPayload").sub))
+	console.log(c.env.BEARER_TOKEN.split(0,10))
+	const tweets_promise = fetch("https://api.x.com/2/usage/tweets?days=30", {
+		headers: {
+			"Authorization": `Bearer ${c.env.BEARER_TOKEN}`
+		}
+	})
+	const [tweets] = await Promise.all([(await tweets_promise).json() as any])
+	console.log(tweets)
+	if (!tweets.data) return c.json({ success: false, message: "Twitter API error." }, 500)
 	return c.json({
-		success: true,
-		url: oauth_url.toString()
+		success:true,
+		usage:tweets.data
 	})
 })
 export default AdminController
