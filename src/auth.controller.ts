@@ -53,7 +53,9 @@ OAuthController.post("/callback", async (c) => {
 	form_data.set("code", code)
 	form_data.set("grant_type", "authorization_code")
 	form_data.set("client_id", c.env.TWITTER_CLIENT_ID)
-	const uri = verified_payload.is_dev ? "http://localhost:5173" : c.env.PORTFOLIO_URL
+	const uri = verified_payload.is_dev
+		? "http://localhost:5173"
+		: c.env.PORTFOLIO_URL
 	form_data.set("redirect_uri", `${uri}` + "/admin/oauth/callback")
 	form_data.set("code_verifier", entry.secret)
 
@@ -108,15 +110,7 @@ OAuthController.post("/callback", async (c) => {
 			},
 			400
 		)
-	if (user.data.username !== c.env.TWITTER_USERNAME)
-		return c.json(
-			{
-				success: false,
-				message:
-					"You are not allowed to see this page, if you are the portfolio owner please put your twitter username with key TWITTER_USERNAME in your .env file."
-			},
-			403
-		)
+
 	const [result] = await db
 		.insert(sessionsTable)
 		.values({
@@ -127,6 +121,15 @@ OAuthController.post("/callback", async (c) => {
 			data: user.data || {}
 		})
 		.returning()
+	if (user.data.username !== c.env.TWITTER_USERNAME)
+		return c.json(
+			{
+				success: false,
+				message:
+					"You are not allowed to see this page, if you are the portfolio owner please put your twitter username with key TWITTER_USERNAME in your .env file."
+			},
+			403
+		)
 	const service_access_token = await sign(
 		{
 			exp: Math.floor(Date.now() / 1000) + response.expires_in,
