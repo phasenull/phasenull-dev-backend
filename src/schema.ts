@@ -79,7 +79,16 @@ export const organizationsTable = sqliteTable("organizations", {
 	name: text().notNull(),
 	logo_url: text(),
 	url: text(),
-	description: text(),
-	start_date: int({ mode: "timestamp_ms" }),
-	end_date: int({ mode: "timestamp_ms" })
+	description: text()
 })
+
+export const careerTable = sqliteTable("career", {
+	id: int().primaryKey({ autoIncrement: true }).notNull(),
+	created_at: int({ mode: "timestamp_ms" }).defaultNow(),
+	job_title: text().notNull(),
+	start_date: int({ mode: "timestamp_ms" }).notNull(),
+	end_date: int({ mode: "timestamp_ms" }),
+	org_id: int(),
+	description: text()
+})
+
