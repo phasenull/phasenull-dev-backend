@@ -8,7 +8,11 @@ export const projectsTable = sqliteTable("projects", {
 	description: text().notNull(),
 	project_start_date: int({ mode: "timestamp_ms" }),
 	project_end_date: int({ mode: "timestamp_ms" }),
-	thumbnail_url: text()
+	thumbnail_url: text(),
+	org_id: int().references(() => organizationsTable.id),
+	disclaimer: text(),
+	url: text(),
+	repo_url: text()
 })
 export const projectToStackTable = sqliteTable(
 	"project_to_stack",
@@ -67,4 +71,15 @@ export const activitiesMediaTable = sqliteTable("activities_media", {
 	created_at: int({ mode: "timestamp_ms" }).defaultNow(),
 	url: text(),
 	type: text().$type<"image" | "video">()
+})
+
+export const organizationsTable = sqliteTable("organizations", {
+	id: int().primaryKey({ autoIncrement: true }).notNull(),
+	created_at: int({ mode: "timestamp_ms" }).defaultNow(),
+	name: text().notNull(),
+	logo_url: text(),
+	url: text(),
+	description: text(),
+	start_date: int({ mode: "timestamp_ms" }),
+	end_date: int({ mode: "timestamp_ms" })
 })
