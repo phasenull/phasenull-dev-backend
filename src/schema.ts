@@ -9,7 +9,7 @@ export const projectsTable = sqliteTable("projects", {
 	project_start_date: int({ mode: "timestamp_ms" }),
 	project_end_date: int({ mode: "timestamp_ms" }),
 	thumbnail_url: text(),
-	org_id: int().references(() => organizationsTable.id),
+	org_id: int(),
 	disclaimer: text(),
 	url: text(),
 	repo_url: text()
