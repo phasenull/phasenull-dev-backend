@@ -28,6 +28,14 @@
 	// 		"bucket_name": "phasenull-dev"
 	// 	}
 	// ],
+	"kv_namespaces": [
+		{
+			"binding": "KV",
+			"id": "1333d97cc52a40b0ac0bb4141dca6669",
+			"preview_id": "a875d02fc5424d28bf5c8b61bc3c7959"
+			// Optional: preview_id used when running `wrangler dev` for local dev
+		}
+	],
 	"d1_databases": [
 		{
 			"binding": "DB",

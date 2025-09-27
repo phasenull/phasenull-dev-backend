@@ -11,6 +11,7 @@ interface Bindings {
 	TWITTER_CLIENT_ID:string
 	TWITTER_CLIENT_SECRET:string
 	JWT_SECRET:string
+	KV: KVNamespace
 	BEARER_TOKEN:string
 	// username for the admin account (NOT USER LABEL OR ID)
 	TWITTER_USERNAME:string
