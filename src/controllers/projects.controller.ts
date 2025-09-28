@@ -12,36 +12,27 @@ ProjectsController.get("/:id", async (c) => {
 		return c.json({ success: false, message: "Invalid stack ID" }, 400)
 	}
 	const db = buildDB(c)
-	const project = await db
+	const [project] = await db
 		.select()
 		.from(projectsTable)
 		.where(eq(projectsTable.id, parseInt(id)))
 		.limit(1)
+	const stacks = await db
+		.select()
+		.from(stackTable)
+		.orderBy(asc(stackTable.id))
 	const relations = await db
 		.select()
 		.from(projectToStackTable)
 		.where(eq(projectToStackTable.project_id, parseInt(id)))
-	const project_stacks = await db
-		.select()
-		.from(stackTable)
-		.where(
-			inArray(
-				stackTable.id,
-				relations
-					.filter((relation) => relation.project_id === parseInt(id))
-					.map((relation) => relation.stack_id)
-			)
-		)
 	if (!project) {
 		return c.json({ success: false, message: "Project not found" }, 404)
 	}
 	return c.json({
 		success: true,
 		project,
-		relations: relations.filter(
-			(relation) => relation.project_id === parseInt(id)
-		),
-		stacks: project_stacks
+		stacks: stacks,
+		relations: relations.filter((r) => r.project_id === project.id)
 	})
 })
 ProjectsController.get("/", async (c) => {
