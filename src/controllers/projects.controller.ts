@@ -17,10 +17,7 @@ ProjectsController.get("/:id", async (c) => {
 		.from(projectsTable)
 		.where(eq(projectsTable.id, parseInt(id)))
 		.limit(1)
-	const stacks = await db
-		.select()
-		.from(stackTable)
-		.orderBy(asc(stackTable.id))
+	const stacks = await db.select().from(stackTable).orderBy(asc(stackTable.id))
 	const relations = await db
 		.select()
 		.from(projectToStackTable)
@@ -35,12 +32,13 @@ ProjectsController.get("/:id", async (c) => {
 		relations: relations.filter((r) => r.project_id === project.id)
 	})
 })
+
 ProjectsController.get("/", async (c) => {
 	const db = buildDB(c)
 	const projects = await db
 		.select()
 		.from(projectsTable)
-		.orderBy(desc(projectsTable.project_end_date))
+		.orderBy(asc(projectsTable.id))
 	return c.json({ success: true, projects })
 })
 async function reloadCache(c: CustomContext) {
@@ -48,7 +46,7 @@ async function reloadCache(c: CustomContext) {
 	const db = buildDB(c)
 	const stacks = await db.select().from(stackTable)
 	const relations = await db.select().from(projectToStackTable)
-	const projects = await db.select().from(projectToStackTable)
+	const projects = await db.select().from(projectsTable).orderBy(desc(projectsTable.project_end_date))
 	await KV.put(
 		"projects_all",
 		JSON.stringify({
@@ -63,7 +61,25 @@ async function reloadCache(c: CustomContext) {
 	)
 	return { stacks, relations, projects }
 }
-ProjectsController.delete("/:id", async (c) => {})
+ProjectsController.delete("/:id", async (c) => {
+	const { id } = c.req.param()
+	if (!id || isNaN(parseInt(id))) {
+		return c.json({ success: false, message: "Invalid project ID" }, 400)
+	}
+	const db = buildDB(c)
+	const [deleted] = await db
+		.delete(projectsTable)
+		.where(eq(projectsTable.id, parseInt(id)))
+		.returning()
+	if (!deleted) {
+		return c.json({ success: false, message: "No project found" }, 404)
+	}
+	return c.json({
+		success: true,
+		message: "Project deleted successfully",
+		deleted: deleted
+	})
+})
 
 ProjectsController.post("/:id/stacks", async (c) => {
 	const { id } = c.req.param()
@@ -71,10 +87,6 @@ ProjectsController.post("/:id/stacks", async (c) => {
 		return c.json({ success: false, message: "Invalid project ID" }, 400)
 	}
 	const body = await c.req.json()
-	const db = buildDB(c)
-	await db
-		.delete(projectToStackTable)
-		.where(eq(projectToStackTable.project_id, parseInt(id)))
 	const stack_ids = body.stack_ids as number[]
 	if (
 		stack_ids &&
@@ -83,6 +95,7 @@ ProjectsController.post("/:id/stacks", async (c) => {
 	) {
 		return c.json({ success: false, message: "Invalid stack IDs" }, 400)
 	}
+	const db = buildDB(c)
 	await db.insert(projectToStackTable).values(
 		stack_ids.map((stack_id) => ({
 			project_id: parseInt(id),
@@ -95,7 +108,28 @@ ProjectsController.post("/:id/stacks", async (c) => {
 		message: "Project stacks updated successfully"
 	})
 })
-ProjectsController.post("/create", async (c) => {
+
+ProjectsController.delete("/:id", async (c) => {
+	const { id } = c.req.param()
+	if (!id || isNaN(parseInt(id))) {
+		return c.json({ success: false, message: "Invalid project ID" }, 400)
+	}
+	const db = buildDB(c)
+	const deleted = await db
+		.delete(projectsTable)
+		.where(eq(projectsTable.id, parseInt(id)))
+		.returning()
+	if (deleted.length === 0) {
+		return c.json({ success: false, message: "Project not found" }, 404)
+	}
+	await reloadCache(c)
+	return c.json({
+		success: true,
+		message: "Project deleted successfully"
+	})
+})
+
+ProjectsController.put("/", async (c) => {
 	const db = buildDB(c)
 	const [result] = await db
 		.insert(projectsTable)
@@ -118,13 +152,24 @@ ProjectsController.patch("/:id", async (c) => {
 		return c.json({ success: false, message: "Invalid project ID" }, 400)
 	}
 	const body = await c.req.json()
+	const project = {
+		...body,
+		id: undefined,
+		created_at: undefined,
+		project_end_date: body.project_end_date
+			? new Date(body.project_end_date)
+			: null,
+		project_start_date: body.project_start_date
+			? new Date(body.project_start_date)
+			: null
+	}
 	const db = buildDB(c)
 	const [upsert] = await db
 		.update(projectsTable)
 		.set({
-			...body,
+			...project,
 			created_at: new Date(),
-			id: undefined
+			id: id
 		})
 		.where(eq(projectsTable.id, parseInt(id)))
 		.returning()
