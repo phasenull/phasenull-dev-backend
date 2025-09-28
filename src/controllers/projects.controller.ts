@@ -80,7 +80,6 @@ ProjectsController.delete("/:id", async (c) => {
 		deleted: deleted
 	})
 })
-
 ProjectsController.post("/:id/stacks", async (c) => {
 	const { id } = c.req.param()
 	if (!id || isNaN(parseInt(id))) {
@@ -109,25 +108,6 @@ ProjectsController.post("/:id/stacks", async (c) => {
 	})
 })
 
-ProjectsController.delete("/:id", async (c) => {
-	const { id } = c.req.param()
-	if (!id || isNaN(parseInt(id))) {
-		return c.json({ success: false, message: "Invalid project ID" }, 400)
-	}
-	const db = buildDB(c)
-	const deleted = await db
-		.delete(projectsTable)
-		.where(eq(projectsTable.id, parseInt(id)))
-		.returning()
-	if (deleted.length === 0) {
-		return c.json({ success: false, message: "Project not found" }, 404)
-	}
-	await reloadCache(c)
-	return c.json({
-		success: true,
-		message: "Project deleted successfully"
-	})
-})
 
 ProjectsController.put("/", async (c) => {
 	const db = buildDB(c)
