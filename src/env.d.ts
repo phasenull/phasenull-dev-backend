@@ -7,6 +7,7 @@ interface Bindings {
 	DB: D1Database
 	LINKEDIN_KEY:string
 	PORTFOLIO_URL:string
+	R2: R2Bucket
 	API_URL:string
 	TWITTER_CLIENT_ID:string
 	TWITTER_CLIENT_SECRET:string
