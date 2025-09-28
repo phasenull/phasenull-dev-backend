@@ -10,7 +10,7 @@ import OAuthController from "./auth.controller"
 const app = new Hono<CustomContext>()
 app.use(
 	cors({
-		allowMethods: ["GET"],
+		allowMethods: ["GET","POST","PUT","DELETE","PATCH"],
 		origin: [
 			"http://localhost:5173",
 			"https://phasenull.dev",

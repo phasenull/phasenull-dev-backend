@@ -1,19 +1,28 @@
 import { relations, sql } from "drizzle-orm"
-import { int, primaryKey, sqliteTable, text } from "drizzle-orm/sqlite-core"
+import { uniqueIndex } from "drizzle-orm/sqlite-core"
+import {
+	int,
+	primaryKey,
+	sqliteTable,
+	text,
+	unique
+} from "drizzle-orm/sqlite-core"
 
 export const projectsTable = sqliteTable("projects", {
 	id: int().primaryKey({ autoIncrement: true }).notNull(),
 	created_at: int({ mode: "timestamp" }).defaultNow(),
-	title: text().notNull(),
-	description: text().notNull(),
+	title: text(),
+	description: text(),
 	project_start_date: int({ mode: "timestamp" }),
 	project_end_date: int({ mode: "timestamp" }),
 	thumbnail_url: text(),
 	org_id: int(),
 	disclaimer: text(),
 	url: text(),
-	repo_url: text()
+	repo_url: text(),
+	is_visible: int({mode: "boolean"}).default(false),
 })
+
 export const projectToStackTable = sqliteTable(
 	"project_to_stack",
 	{
@@ -24,7 +33,13 @@ export const projectToStackTable = sqliteTable(
 			.references(() => stackTable.id)
 			.notNull()
 	},
-	(table) => [primaryKey({ columns: [table.project_id, table.stack_id] })]
+	(table) => [
+		primaryKey({ columns: [table.project_id, table.stack_id] }),
+		uniqueIndex("project_to_stack_unique_idx").on(
+			table.project_id,
+			table.stack_id
+		)
+	]
 )
 
 export const stackTable = sqliteTable("stack", {
@@ -91,4 +106,3 @@ export const careerTable = sqliteTable("career", {
 	org_id: int(),
 	description: text()
 })
-
