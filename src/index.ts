@@ -2,19 +2,21 @@ import { Hono } from "hono"
 import { drizzle } from "drizzle-orm/d1"
 import { projectsTable, projectToStackTable, stackTable } from "./schema"
 import * as schema from "./schema"
-import { desc, eq, inArray } from "drizzle-orm"
+import { desc, eq, inArray, not } from "drizzle-orm"
 import { cors } from "hono/cors"
 import AdminController from "./admin.controller"
 import { CustomContext } from "./env"
 import OAuthController from "./auth.controller"
+import { HOSTNAME, PORTFOLIO_URL } from "./constants"
+import { readFile, readFileSync } from "fs"
 const app = new Hono<CustomContext>()
 app.use(
 	cors({
 		allowMethods: ["GET","POST","PUT","DELETE","PATCH"],
 		origin: [
 			"http://localhost:5173",
-			"https://phasenull.dev",
-			"https://www.phasenull.dev",
+			`${PORTFOLIO_URL}`,
+			`https://www.${HOSTNAME}`,
 			"https://phasenull-dev-frontend.phasenull.workers.dev"
 		]
 	})
@@ -97,6 +99,39 @@ app.get("/projects/all", async (c) => {
 		relations: relations
 	})
 })
+const header = `<?xml version="1.0" encoding="UTF-8"?>
+
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">`
+app.get("/generate-sitemap", async (c) => {
+	const db = drizzle(c.env.DB, { schema })
+	const projects = await db.select().from(projectsTable).where(not(eq(projectsTable.is_visible, false)))
+	if (!projects) {
+		return c.json({ success: false, message: "No projects found" }, 404)
+	}
+	const static_pages = [`${PORTFOLIO_URL}/pinboard`,`${PORTFOLIO_URL}/career`]
+	const prioritized_pages = static_pages.map((url) => buildUrlXML(url, 0.9, "weekly", new Date().toISOString()))
+	const xmls = projects.map((project) => {
+		const loc = `${PORTFOLIO_URL}/projects/${project.id}/${project.title?.toLowerCase().replace(/\s+/g, "-")}`
+		const priority = 0.3
+		const changefreq: sitemap.changefreq = "monthly"
+		const lastmod = project?.created_at?.toISOString() || new Date().toISOString()
+		return buildUrlXML(loc, priority, changefreq,lastmod)
+	})
+	const footer = `</urlset>`
+	const sitemap = header + buildUrlXML(`${PORTFOLIO_URL}`,1.0,"weekly",new Date().toISOString()) + prioritized_pages.join("\n") + xmls.join("\n") + footer
+	return c.body(sitemap, 200, { "Content-Type": "application/xml" })
+})
+namespace sitemap {
+	export type changefreq = "always" | "hourly" | "daily" | "weekly" | "monthly" | "yearly" | "never"
+}
+function buildUrlXML(loc: string, priority: number, changefreq: sitemap.changefreq,lastmod?: string) {
+	return `<url>
+	<loc>${loc}</loc>
+	<changefreq>${changefreq}</changefreq>
+	<priority>${priority}</priority>
+	${lastmod ? `<lastmod>${lastmod}</lastmod>` : ""}
+</url>`
+}
 
 app.get("/projects/:id", async (c) => {
 	const { id } = c.req.param()
