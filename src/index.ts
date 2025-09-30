@@ -66,7 +66,7 @@ app.get("/projects/all", async (c) => {
 		}
 	}
 	const db = drizzle(c.env.DB, { schema })
-	const projects = await db.select().from(projectsTable)
+	const projects = await db.select().from(projectsTable).where(not(eq(projectsTable.is_visible, false)))
 	const stacks = await db.select().from(stackTable)
 	const relations = await db.select().from(projectToStackTable)
 
@@ -133,25 +133,6 @@ function buildUrlXML(loc: string, priority: number, changefreq: sitemap.changefr
 </url>`
 }
 
-app.get("/projects/:id", async (c) => {
-	const { id } = c.req.param()
-	const db = drizzle(c.env.DB, { schema })
-	const projects = await db.select().from(projectsTable)
-	const stacks = await db.select().from(stackTable)
-	const relations = await db.select().from(projectToStackTable)
-
-	return c.json({
-		success: true,
-		projects: projects.sort((a, b) => {
-			return (
-				(b.project_end_date?.getTime() as number) -
-				(a.project_end_date?.getTime() as number)
-			)
-		}),
-		stacks: stacks,
-		relations: relations
-	})
-})
 
 app.get("/social/get-recent-activities", async (c) => {
 	const db = drizzle(c.env.DB, { schema })
