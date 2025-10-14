@@ -125,7 +125,7 @@ app.get("/generate-sitemap", async (c) => {
 		const loc = `${PORTFOLIO_URL}/projects/${project.id}/${project.title
 			?.toLowerCase()
 			.replace(/\s+/g, "-")}`
-		const priority = 0.3
+		const priority = 0.6
 		const changefreq: sitemap.changefreq = "weekly"
 		const lastmod =
 			project?.created_at?.toISOString() || new Date().toISOString()
