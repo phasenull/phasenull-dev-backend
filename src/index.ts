@@ -126,7 +126,7 @@ app.get("/generate-sitemap", async (c) => {
 			?.toLowerCase()
 			.replace(/\s+/g, "-")}`
 		const priority = 0.3
-		const changefreq: sitemap.changefreq = "monthly"
+		const changefreq: sitemap.changefreq = "weekly"
 		const lastmod =
 			project?.created_at?.toISOString() || new Date().toISOString()
 		return buildUrlXML(loc, priority, changefreq, lastmod)
