@@ -4,6 +4,7 @@ import { buildDB } from "../utils"
 import { projectsTable, projectToStackTable, stackTable } from "../schema"
 import { asc, desc, eq, inArray } from "drizzle-orm"
 import { RowData } from "../data-table.types"
+import { reloadCache } from "./projects.controller"
 
 const StacksController = new Hono<CustomContext>()
 StacksController.get("/:id", async (c) => {
@@ -31,21 +32,6 @@ StacksController.get("/", async (c) => {
 	const stacks = await db.select().from(stackTable).orderBy(asc(stackTable.id))
 	return c.json({ success: true, stacks })
 })
-async function reloadCache(c: CustomContext) {
-	const KV = c.env.KV as KVNamespace
-	const db = buildDB(c)
-	const stacks = await db.select().from(stackTable).orderBy(asc(stackTable.id))
-	const relations = await db.select().from(projectToStackTable)
-	const projects = await db.select().from(projectsTable).orderBy(desc(projectsTable.project_end_date))
-	await KV.put(
-		"projects_all",
-		JSON.stringify({
-			data: { success: true, stacks: stacks, relations: relations, projects: projects },
-			created_at: new Date().toISOString()
-		})
-	)
-	return { stacks, relations, projects }
-}
 StacksController.delete("/", async (c) => {
 	const body = await c.req.json()
 	const ids = body.ids as number[]

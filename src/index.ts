@@ -66,7 +66,7 @@ app.get("/projects/all", async (c) => {
 		}
 	}
 	const db = drizzle(c.env.DB, { schema })
-	const projects = await db.select().from(projectsTable).where(not(eq(projectsTable.is_visible, false)))
+	const projects = await db.select().from(projectsTable).where(eq(projectsTable.is_visible, true))
 	const stacks = await db.select().from(stackTable)
 	const relations = await db.select().from(projectToStackTable)
 

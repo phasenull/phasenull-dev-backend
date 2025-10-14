@@ -41,12 +41,12 @@ ProjectsController.get("/", async (c) => {
 		.orderBy(asc(projectsTable.id))
 	return c.json({ success: true, projects })
 })
-async function reloadCache(c: CustomContext) {
+export async function reloadCache(c: CustomContext) {
 	const KV = c.env.KV as KVNamespace
 	const db = buildDB(c)
 	const stacks = await db.select().from(stackTable)
 	const relations = await db.select().from(projectToStackTable)
-	const projects = await db.select().from(projectsTable).orderBy(desc(projectsTable.project_end_date))
+	const projects = await db.select().from(projectsTable).where(eq(projectsTable.is_visible, true)).orderBy(desc(projectsTable.project_end_date))
 	await KV.put(
 		"projects_all",
 		JSON.stringify({
