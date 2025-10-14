@@ -12,7 +12,7 @@ import { readFile, readFileSync } from "fs"
 const app = new Hono<CustomContext>()
 app.use(
 	cors({
-		allowMethods: ["GET","POST","PUT","DELETE","PATCH"],
+		allowMethods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
 		origin: [
 			"http://localhost:5173",
 			`${PORTFOLIO_URL}`,
@@ -66,7 +66,10 @@ app.get("/projects/all", async (c) => {
 		}
 	}
 	const db = drizzle(c.env.DB, { schema })
-	const projects = await db.select().from(projectsTable).where(eq(projectsTable.is_visible, true))
+	const projects = await db
+		.select()
+		.from(projectsTable)
+		.where(eq(projectsTable.is_visible, true))
 	const stacks = await db.select().from(stackTable)
 	const relations = await db.select().from(projectToStackTable)
 
@@ -104,27 +107,55 @@ const header = `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">`
 app.get("/generate-sitemap", async (c) => {
 	const db = drizzle(c.env.DB, { schema })
-	const projects = await db.select().from(projectsTable).where(not(eq(projectsTable.is_visible, false)))
+	const projects = await db
+		.select()
+		.from(projectsTable)
+		.where(not(eq(projectsTable.is_visible, false)))
 	if (!projects) {
 		return c.json({ success: false, message: "No projects found" }, 404)
 	}
-	const static_pages = [`${PORTFOLIO_URL}/pinboard`,`${PORTFOLIO_URL}/career`]
-	const prioritized_pages = static_pages.map((url) => buildUrlXML(url, 0.9, "weekly", new Date().toISOString()))
+	const static_pages = [`${PORTFOLIO_URL}/pinboard`, 
+		// `${PORTFOLIO_URL}/career`
+
+	]
+	const prioritized_pages = static_pages.map((url) =>
+		buildUrlXML(url, 0.9, "weekly", new Date().toISOString())
+	)
 	const xmls = projects.map((project) => {
-		const loc = `${PORTFOLIO_URL}/projects/${project.id}/${project.title?.toLowerCase().replace(/\s+/g, "-")}`
+		const loc = `${PORTFOLIO_URL}/projects/${project.id}/${project.title
+			?.toLowerCase()
+			.replace(/\s+/g, "-")}`
 		const priority = 0.3
 		const changefreq: sitemap.changefreq = "monthly"
-		const lastmod = project?.created_at?.toISOString() || new Date().toISOString()
-		return buildUrlXML(loc, priority, changefreq,lastmod)
+		const lastmod =
+			project?.created_at?.toISOString() || new Date().toISOString()
+		return buildUrlXML(loc, priority, changefreq, lastmod)
 	})
 	const footer = `</urlset>`
-	const sitemap = header + buildUrlXML(`${PORTFOLIO_URL}`,1.0,"weekly",new Date().toISOString()) + prioritized_pages.join("\n") + xmls.join("\n") + footer
+	const sitemap =
+		header +
+		buildUrlXML(`${PORTFOLIO_URL}`, 1.0, "weekly", new Date().toISOString()) +
+		prioritized_pages.join("\n") +
+		xmls.join("\n") +
+		footer
 	return c.body(sitemap, 200, { "Content-Type": "application/xml" })
 })
 namespace sitemap {
-	export type changefreq = "always" | "hourly" | "daily" | "weekly" | "monthly" | "yearly" | "never"
+	export type changefreq =
+		| "always"
+		| "hourly"
+		| "daily"
+		| "weekly"
+		| "monthly"
+		| "yearly"
+		| "never"
 }
-function buildUrlXML(loc: string, priority: number, changefreq: sitemap.changefreq,lastmod?: string) {
+function buildUrlXML(
+	loc: string,
+	priority: number,
+	changefreq: sitemap.changefreq,
+	lastmod?: string
+) {
 	return `<url>
 	<loc>${loc}</loc>
 	<changefreq>${changefreq}</changefreq>
@@ -132,7 +163,6 @@ function buildUrlXML(loc: string, priority: number, changefreq: sitemap.changefr
 	${lastmod ? `<lastmod>${lastmod}</lastmod>` : ""}
 </url>`
 }
-
 
 app.get("/social/get-recent-activities", async (c) => {
 	const db = drizzle(c.env.DB, { schema })
