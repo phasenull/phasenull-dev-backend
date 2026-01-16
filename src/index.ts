@@ -114,7 +114,8 @@ app.get("/generate-sitemap", async (c) => {
 	if (!projects) {
 		return c.json({ success: false, message: "No projects found" }, 404)
 	}
-	const static_pages = [`${PORTFOLIO_URL}/pinboard`, 
+	const static_pages : string[] = [
+		// `${PORTFOLIO_URL}/pinboard`, 
 		// `${PORTFOLIO_URL}/career`
 
 	]
@@ -182,8 +183,8 @@ app.get("/social/get-recent-activities", async (c) => {
 	])
 	return c.json({
 		success: true,
-		activity_list: activities || [],
-		media_list: media_list || []
+		activity_list: [],
+		media_list: []
 	})
 })
 
