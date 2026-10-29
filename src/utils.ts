@@ -42,7 +42,6 @@ export async function getTwitterUserFromBearer(bearer: string) {
 			username: string
 		}
 	}
-	console.log("user data",data)
 	if (!data.data) return
 	return data
 }
@@ -54,7 +53,8 @@ export async function getBearerFromServiceToken(
 	try {
 		payload = (await verify(
 			service_token,
-			c.env.JWT_SECRET + "-JWT_SESSION"
+			c.env.JWT_SECRET + "-JWT_SESSION",
+			"HS256"
 		)) as any
 	} catch {
 		return [false, "service token validation failed"]

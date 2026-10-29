@@ -31,3 +31,6 @@ lerna-debug.log*
 
 # misc
 .DS_Store
+
+# cf build output and generated types
+.cloudflare/

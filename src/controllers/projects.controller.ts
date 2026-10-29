@@ -67,6 +67,10 @@ ProjectsController.delete("/:id", async (c) => {
 		return c.json({ success: false, message: "Invalid project ID" }, 400)
 	}
 	const db = buildDB(c)
+	// project_to_stack references the project, remove the links first
+	await db
+		.delete(projectToStackTable)
+		.where(eq(projectToStackTable.project_id, parseInt(id)))
 	const [deleted] = await db
 		.delete(projectsTable)
 		.where(eq(projectsTable.id, parseInt(id)))
@@ -74,6 +78,7 @@ ProjectsController.delete("/:id", async (c) => {
 	if (!deleted) {
 		return c.json({ success: false, message: "No project found" }, 404)
 	}
+	await reloadCache(c)
 	return c.json({
 		success: true,
 		message: "Project deleted successfully",
@@ -86,11 +91,11 @@ ProjectsController.post("/:id/stacks", async (c) => {
 		return c.json({ success: false, message: "Invalid project ID" }, 400)
 	}
 	const body = await c.req.json()
-	const stack_ids = body.stack_ids as number[]
+	const stack_ids = body?.stack_ids as number[]
 	if (
-		stack_ids &&
-		stack_ids.length > 0 &&
-		stack_ids.some((id: number) => isNaN(id))
+		!Array.isArray(stack_ids) ||
+		stack_ids.length === 0 ||
+		stack_ids.some((id) => !Number.isInteger(id))
 	) {
 		return c.json({ success: false, message: "Invalid stack IDs" }, 400)
 	}
@@ -132,10 +137,16 @@ ProjectsController.patch("/:id", async (c) => {
 		return c.json({ success: false, message: "Invalid project ID" }, 400)
 	}
 	const body = await c.req.json()
+	// only accept editable columns from the request body
 	const project = {
-		...body,
-		id: undefined,
-		created_at: undefined,
+		title: body.title,
+		description: body.description,
+		thumbnail_url: body.thumbnail_url,
+		org_id: body.org_id,
+		disclaimer: body.disclaimer,
+		url: body.url,
+		repo_url: body.repo_url,
+		is_visible: body.is_visible,
 		project_end_date: body.project_end_date
 			? new Date(body.project_end_date)
 			: null,
@@ -148,8 +159,7 @@ ProjectsController.patch("/:id", async (c) => {
 		.update(projectsTable)
 		.set({
 			...project,
-			created_at: new Date(),
-			id: id
+			created_at: new Date()
 		})
 		.where(eq(projectsTable.id, parseInt(id)))
 		.returning()

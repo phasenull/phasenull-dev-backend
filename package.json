@@ -2,17 +2,18 @@
   "name": "phasenull-dev-backend",
   "type": "module",
   "scripts": {
-    "dev": "wrangler dev",
-    "deploy": "wrangler deploy --minify",
+    "dev": "cf dev",
+    "deploy": "cf deploy",
     "cf-typegen": "wrangler types --env-interface CloudflareBindings"
   },
   "dependencies": {
-    "@types/node": "^24.1.0",
-    "drizzle-orm": "^0.44.4",
-    "hono": "^4.8.10"
+    "@types/node": "^24.19.2",
+    "drizzle-orm": "^0.45.4",
+    "hono": "^4.13.14"
   },
   "devDependencies": {
-    "drizzle-kit": "^0.31.4",
-    "wrangler": "^4.4.0"
+    "cf": "^1.0.0-beta.25",
+    "drizzle-kit": "^0.31.11",
+    "wrangler": "^4.155.0"
   }
 }

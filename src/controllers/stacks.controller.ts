@@ -7,6 +7,16 @@ import { RowData } from "../data-table.types"
 import { reloadCache } from "./projects.controller"
 
 const StacksController = new Hono<CustomContext>()
+// only these columns can be set from the admin data table
+function editableStackFields(row: RowData) {
+	return {
+		key: row.key,
+		description: row.description,
+		url: row.url,
+		type: row.type,
+		image_url: row.image_url
+	}
+}
 StacksController.get("/:id", async (c) => {
 	const { id } = c.req.param()
 	if (!id || isNaN(parseInt(id))) {
@@ -39,6 +49,10 @@ StacksController.delete("/", async (c) => {
 		return c.json({ success: false, message: "Invalid stack IDs" }, 400)
 	}
 	const db = buildDB(c)
+	// project_to_stack references the stack, remove the links first
+	await db
+		.delete(projectToStackTable)
+		.where(inArray(projectToStackTable.stack_id, ids))
 	await db.delete(stackTable).where(inArray(stackTable.id, ids))
 	await reloadCache(c)
 	return c.json({ success: true, message: "Stacks deleted successfully" })
@@ -55,10 +69,9 @@ StacksController.patch("/", async (c) => {
 	for (const row of rows) {
 		const id = parseInt(row.id as string)
 		if (isNaN(id)) continue
-		const { id: _, _isModified, _isNew, _isSelected, created_at,...data } = row
 		const result = await db
 			.update(stackTable)
-			.set({ ...data } as any)
+			.set(editableStackFields(row))
 			.where(eq(stackTable.id, id)).returning()
 		results.push(result)
 	}
@@ -74,9 +87,8 @@ StacksController.put("/", async (c) => {
 	const db = buildDB(c)
 	const results = await db.insert(stackTable).values(
 		rows.map((row) => {
-			const { id, _isNew, _isModified, _isSelected, created_at, ...data } = row
-			if (!_isNew) throw new Error("All rows must be new for insertion")
-			return { ...data as any,created_at: new Date() }
+			if (!row._isNew) throw new Error("All rows must be new for insertion")
+			return { ...editableStackFields(row), key: String(row.key ?? ""), created_at: new Date() }
 		})
 	).onConflictDoNothing().returning()
 	await reloadCache(c)

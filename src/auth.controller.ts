@@ -22,7 +22,7 @@ OAuthController.post("/callback", async (c) => {
 		)
 	let verified_payload
 	try {
-		verified_payload = await verify(state, c.env.JWT_SECRET)
+		verified_payload = await verify(state, c.env.JWT_SECRET, "HS256")
 	} catch (e) {
 		return c.json(
 			{ success: false, message: "request has expired or invalid." },
@@ -49,6 +49,16 @@ OAuthController.post("/callback", async (c) => {
 			)
 		)
 		.limit(1)
+	if (!entry)
+		return c.json(
+			{ success: false, message: "request has expired or invalid." },
+			400
+		)
+	// single use: mark the code verifier as consumed before exchanging the code
+	await db
+		.update(codeChallangesTable)
+		.set({ used_at: new Date() })
+		.where(eq(codeChallangesTable.id, entry.id))
 	const form_data = new URLSearchParams()
 	form_data.set("code", code)
 	form_data.set("grant_type", "authorization_code")
@@ -74,7 +84,6 @@ OAuthController.post("/callback", async (c) => {
 		scope: "tweet.read"
 		error_description?: string
 	}
-	console.log(response)
 	if (response.error_description) {
 		return c.json(
 			{
@@ -94,6 +103,7 @@ OAuthController.post("/callback", async (c) => {
 		)
 	if (
 		!(
+			response.scope &&
 			response.scope.includes("tweet.read") &&
 			response.scope.includes("users.email")
 		)
@@ -111,17 +121,19 @@ OAuthController.post("/callback", async (c) => {
 			400
 		)
 
+	const is_owner = user.data.username === c.env.TWITTER_USERNAME
 	const [result] = await db
 		.insert(sessionsTable)
 		.values({
-			bearer: token,
+			// sessions of other accounts are only kept as a login log, don't store their twitter token
+			bearer: is_owner ? token : "",
 			ip: remote_ip,
 			account_userid: user?.data.id,
 			account_username: user?.data.username,
 			data: user.data || {}
 		})
 		.returning()
-	if (user.data.username !== c.env.TWITTER_USERNAME)
+	if (!is_owner)
 		return c.json(
 			{
 				success: false,
@@ -167,13 +179,15 @@ OAuthController.get("/authorize", async (c) => {
 			ip: c.req.header("CF-Connecting-IP")
 		})
 		.returning()
-	const is_dev = !!c.req.query("dev")
+	// the localhost redirect is only for `wrangler dev`, never for the deployed worker
+	const is_dev =
+		!!c.req.query("dev") && new URL(c.req.url).hostname === "localhost"
 	const jwt = await sign(
 		{
 			iat: Math.floor(Date.now() / 1000),
 			exp: Math.floor(Date.now() / 1000) + 15 * 60,
 			secret: entry.id,
-			is_dev: !!c.req.query("dev")
+			is_dev
 		},
 		c.env.JWT_SECRET
 	)
@@ -187,7 +201,6 @@ OAuthController.get("/authorize", async (c) => {
 	oauth_url.searchParams.set("state", jwt)
 	oauth_url.searchParams.set("code_challenge", hash)
 	oauth_url.searchParams.set("code_challenge_method", "S256")
-	console.log("returning url", c.req.header("Host"), oauth_url.toString())
 	return c.json({
 		success: true,
 		url: oauth_url.toString()
