@@ -38,9 +38,7 @@ AdminController.get("/whoami", async (c) => {
 	return c.json({ success: true, user: user.data })
 })
 AdminController.get("/list-sessions", async (c) => {
-	const page = c.req.query("page")
-		? Math.max(0, parseInt(c.req.query("page") as string))
-		: 1
+	const page = Math.max(1, parseInt(c.req.query("page") || "1") || 1)
 	const db = buildDB(c)
 	const sessions = await db
 		.select()
@@ -62,22 +60,22 @@ AdminController.get("/list-sessions", async (c) => {
 })
 AdminController.get("/usage", async (c) => {
 	const KV = c.env.KV
-	const cached = await KV.get("usage_twitter")
+	const cached = await KV.get<{ data: any; created_at: string }>(
+		"usage_twitter",
+		"json"
+	)
 	if (
-		cached &&
-		cached !== "undefined" &&
+		cached?.created_at &&
 		new Date(cached.created_at).getTime() + 1000 * 60 * 60 * 1 > new Date().getTime()
 	) {
 		return c.json({ success: true, usage: cached.data })
 	}
-	console.log(c.env.BEARER_TOKEN.split(0, 10))
 	const tweets_promise = fetch("https://api.x.com/2/usage/tweets?days=30", {
 		headers: {
 			Authorization: `Bearer ${c.env.BEARER_TOKEN}`
 		}
 	})
 	const [tweets] = await Promise.all([(await tweets_promise).json() as any])
-	console.log(tweets)
 	if (!tweets.data)
 		return c.json(
 			{ success: false, message: `Twitter API error: ${tweets.detail}` },
@@ -86,10 +84,7 @@ AdminController.get("/usage", async (c) => {
 	await KV.put(
 		"usage_twitter",
 		JSON.stringify({
-			data: {
-				success: true,
-				usage: tweets.data
-			},
+			data: tweets.data,
 			created_at: new Date().toISOString()
 		})
 	)

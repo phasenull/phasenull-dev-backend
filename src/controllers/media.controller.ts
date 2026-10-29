@@ -2,6 +2,16 @@ import { Hono } from "hono";
 import { CustomContext } from "../env";
 import { CDN_URL } from "../constants";
 
+// files are served inline from the cdn, so only allow media types that can't run scripts (no svg/html)
+const ALLOWED_CONTENT_TYPES = [
+	"image/png",
+	"image/jpeg",
+	"image/gif",
+	"image/webp",
+	"image/avif",
+	"video/mp4",
+	"video/webm"
+]
 const MediaController = new Hono<CustomContext>()
 MediaController.put("/upload", async (c) => {
 	const R2 = c.env.R2 as R2Bucket;
@@ -9,6 +19,9 @@ MediaController.put("/upload", async (c) => {
 	const file = formData.get("file") as File;
 	if (!file) {
 		return c.json({ success: false, message: "No file provided" }, 400);
+	}
+	if (!(file instanceof File) || !ALLOWED_CONTENT_TYPES.includes(file.type)) {
+		return c.json({ success: false, message: "Unsupported file type" }, 400);
 	}
 	if (file.size > 50 * 1024 * 1024) {
 		return c.json({ success: false, message: "File size exceeds 50MB" }, 400);

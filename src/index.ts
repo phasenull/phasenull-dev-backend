@@ -2,25 +2,49 @@ import { Hono } from "hono"
 import { drizzle } from "drizzle-orm/d1"
 import { projectsTable, projectToStackTable, stackTable } from "./schema"
 import * as schema from "./schema"
-import { desc, eq, inArray, not } from "drizzle-orm"
+import { and, desc, eq, inArray, not } from "drizzle-orm"
 import { cors } from "hono/cors"
+import { secureHeaders } from "hono/secure-headers"
 import AdminController from "./admin.controller"
 import { CustomContext } from "./env"
 import OAuthController from "./auth.controller"
 import { HOSTNAME, PORTFOLIO_URL } from "./constants"
-import { readFile, readFileSync } from "fs"
+import { RateLimitMiddleware } from "./rate-limit.middleware"
 const app = new Hono<CustomContext>()
+const ALLOWED_ORIGINS = [
+	`${PORTFOLIO_URL}`,
+	`https://www.${HOSTNAME}`,
+	"https://phasenull-dev-frontend.phasenull.workers.dev"
+]
+const DEV_ORIGINS = ["http://localhost:5173"]
 app.use(
 	cors({
 		allowMethods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
-		origin: [
-			"http://localhost:5173",
-			`${PORTFOLIO_URL}`,
-			`https://www.${HOSTNAME}`,
-			"https://phasenull-dev-frontend.phasenull.workers.dev"
-		]
+		origin: (origin, c) => {
+			if (ALLOWED_ORIGINS.includes(origin)) return origin
+			// only allow the vite dev server when the worker itself runs locally (wrangler dev)
+			const is_local = new URL(c.req.url).hostname === "localhost"
+			if (is_local && DEV_ORIGINS.includes(origin)) return origin
+			return null
+		}
 	})
 )
+// API only returns JSON/XML, so lock everything else down
+app.use(
+	secureHeaders({
+		contentSecurityPolicy: {
+			defaultSrc: ["'none'"],
+			frameAncestors: ["'none'"]
+		},
+		crossOriginResourcePolicy: "cross-origin"
+	})
+)
+app.use("/oauth/*", RateLimitMiddleware)
+app.use("/admin/*", RateLimitMiddleware)
+app.onError((err, c) => {
+	console.error(err)
+	return c.json({ success: false, message: "Internal server error." }, 500)
+})
 app.get("/status", (c) => {
 	return c.json({ success: true })
 })
@@ -35,23 +59,34 @@ app.get("/projects/search", async (c) => {
 			projects: [],
 			message: "Cant find search param: stacks"
 		})
-	const stacks_array = stacks_raw.split(",").map((e) => parseInt(e))
+	const stacks_array = stacks_raw
+		.split(",")
+		.slice(0, 50)
+		.map((e) => parseInt(e))
+		.filter((e) => !isNaN(e))
+	if (stacks_array.length === 0)
+		return c.json({ success: true, projects: [] })
 	const db = drizzle(c.env.DB, { schema })
 	const projects = await db
 		.select()
 		.from(projectToStackTable)
-		.where(inArray(projectToStackTable.stack_id, stacks_array))
-		.leftJoin(
+		.innerJoin(
 			projectsTable,
 			eq(projectsTable.id, projectToStackTable.project_id)
+		)
+		.where(
+			and(
+				inArray(projectToStackTable.stack_id, stacks_array),
+				eq(projectsTable.is_visible, true)
+			)
 		)
 	return c.json({ success: true, projects: projects })
 })
 app.get("/projects/all", async (c) => {
-	const is_invalidate = c.req.query("invalidate")
+	// cache is refreshed by admin write endpoints (reloadCache), so there is no public cache-bust param
 	const KV = c.env.KV
 	const cached = await KV.get("projects_all")
-	if (cached && cached !== "undefined" && !is_invalidate) {
+	if (cached && cached !== "undefined") {
 		try {
 			const parsed = JSON.parse(cached) as { data: any; created_at: string }
 			if (
@@ -83,18 +118,23 @@ app.get("/projects/all", async (c) => {
 		)
 	})
 
-	await KV.put(
-		"projects_all",
-		JSON.stringify({
-			data: {
-				success: true,
-				projects: sortedProjects,
-				stacks: stacks,
-				relations: relations
-			},
-			created_at: new Date().toISOString()
-		})
-	)
+	try {
+		await KV.put(
+			"projects_all",
+			JSON.stringify({
+				data: {
+					success: true,
+					projects: sortedProjects,
+					stacks: stacks,
+					relations: relations
+				},
+				created_at: new Date().toISOString()
+			})
+		)
+	} catch (e) {
+		// a failed cache write (e.g. KV quota) should not take the site down
+		console.error("Error writing projects_all cache:", e)
+	}
 	return c.json({
 		success: true,
 		projects: sortedProjects,
@@ -123,9 +163,9 @@ app.get("/generate-sitemap", async (c) => {
 		buildUrlXML(url, 0.9, "weekly", new Date().toISOString())
 	)
 	const xmls = projects.map((project) => {
-		const loc = `${PORTFOLIO_URL}/projects/${project.id}/${project.title
-			?.toLowerCase()
-			.replace(/\s+/g, "-")}`
+		const loc = `${PORTFOLIO_URL}/projects/${project.id}/${encodeURIComponent(
+			project.title?.toLowerCase().replace(/\s+/g, "-") || ""
+		)}`
 		const priority = 0.6
 		const changefreq: sitemap.changefreq = "weekly"
 		const lastmod =
@@ -151,6 +191,14 @@ namespace sitemap {
 		| "yearly"
 		| "never"
 }
+function escapeXML(value: string) {
+	return value
+		.replace(/&/g, "&amp;")
+		.replace(/</g, "&lt;")
+		.replace(/>/g, "&gt;")
+		.replace(/"/g, "&quot;")
+		.replace(/'/g, "&apos;")
+}
 function buildUrlXML(
 	loc: string,
 	priority: number,
@@ -158,7 +206,7 @@ function buildUrlXML(
 	lastmod?: string
 ) {
 	return `<url>
-	<loc>${loc}</loc>
+	<loc>${escapeXML(loc)}</loc>
 	<changefreq>${changefreq}</changefreq>
 	<priority>${priority}</priority>
 	${lastmod ? `<lastmod>${lastmod}</lastmod>` : ""}
