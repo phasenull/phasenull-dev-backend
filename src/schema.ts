@@ -10,7 +10,7 @@ import {
 
 export const projectsTable = sqliteTable("projects", {
 	id: int().primaryKey({ autoIncrement: true }).notNull(),
-	created_at: int({ mode: "timestamp" }).defaultNow(),
+	created_at: int({ mode: "timestamp" }).default(sql`(unixepoch())`),
 	title: text(),
 	description: text(),
 	project_start_date: int({ mode: "timestamp" }),
@@ -46,7 +46,7 @@ export const stackTable = sqliteTable("stack", {
 	id: int().primaryKey({ autoIncrement: true }).notNull(),
 	key: text().notNull().unique(),
 	description: text(),
-	created_at: int({ mode: "timestamp" }).defaultNow(),
+	created_at: int({ mode: "timestamp" }).default(sql`(unixepoch())`),
 	url: text(),
 	type: text().$type<
 		"library" | "framework" | "runtime" | "language" | "other" | "tool"
@@ -57,7 +57,7 @@ export const stackTable = sqliteTable("stack", {
 export const activitiesTable = sqliteTable("activities", {
 	id: int().primaryKey({ autoIncrement: true }).notNull(),
 	content: text(),
-	created_at: int({ mode: "timestamp" }).defaultNow(),
+	created_at: int({ mode: "timestamp" }).default(sql`(unixepoch())`),
 	url: text(),
 	platform: text().$type<"linkedin" | "youtube" | "twitter" | "other">()
 })
@@ -66,14 +66,14 @@ export const codeChallangesTable = sqliteTable("code_challanges", {
 	id: int().primaryKey({ autoIncrement: true }).notNull(),
 	secret: text().notNull(),
 	ip: text(),
-	created_at: int({ mode: "timestamp" }).defaultNow(),
+	created_at: int({ mode: "timestamp" }).default(sql`(unixepoch())`),
 	used_at: int({ mode: "timestamp" })
 })
 
 export const sessionsTable = sqliteTable("sessions", {
 	id: int().primaryKey({ autoIncrement: true }).notNull(),
 	ip: text().notNull(),
-	created_at: int({ mode: "timestamp" }).defaultNow(),
+	created_at: int({ mode: "timestamp" }).default(sql`(unixepoch())`),
 	bearer: text().notNull(),
 	account_userid: text().notNull(),
 	account_username: text().notNull(),
@@ -83,14 +83,14 @@ export const sessionsTable = sqliteTable("sessions", {
 export const activitiesMediaTable = sqliteTable("activities_media", {
 	id: int().primaryKey({ autoIncrement: true }).notNull(),
 	activity_id: int().references(() => activitiesTable.id),
-	created_at: int({ mode: "timestamp" }).defaultNow(),
+	created_at: int({ mode: "timestamp" }).default(sql`(unixepoch())`),
 	url: text(),
 	type: text().$type<"image" | "video">()
 })
 
 export const organizationsTable = sqliteTable("organizations", {
 	id: int().primaryKey({ autoIncrement: true }).notNull(),
-	created_at: int({ mode: "timestamp" }).defaultNow(),
+	created_at: int({ mode: "timestamp" }).default(sql`(unixepoch())`),
 	name: text().notNull(),
 	logo_url: text(),
 	url: text(),
@@ -99,7 +99,7 @@ export const organizationsTable = sqliteTable("organizations", {
 
 export const careerTable = sqliteTable("career", {
 	id: int().primaryKey({ autoIncrement: true }).notNull(),
-	created_at: int({ mode: "timestamp" }).defaultNow(),
+	created_at: int({ mode: "timestamp" }).default(sql`(unixepoch())`),
 	job_title: text().notNull(),
 	start_date: int({ mode: "timestamp" }).notNull(),
 	end_date: int({ mode: "timestamp" }),
