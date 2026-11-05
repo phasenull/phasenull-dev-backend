@@ -35,6 +35,6 @@ Slime Merge).
 
 ## 2026-11-05-add-goblox.sql
 
-Adds goblox (the Go port of the roblox-ts compiler) and a Go stack, linked to Go, TypeScript, roblox-ts, luau and
-TypeTorch. Upload the stack icon to the cdn root first (`go.svg`, from https://go.dev/images/go-logo-blue.svg), run the
+Adds goblox (the Go port of the roblox-ts compiler) and a Go stack, linked to Go, TypeScript, roblox-ts and luau.
+Upload the stack icon to the cdn root first (`go.svg`, from https://go.dev/images/go-logo-blue.svg), run the
 file against the production database, then delete the `projects_all` KV key.

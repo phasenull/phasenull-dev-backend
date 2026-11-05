@@ -21,4 +21,4 @@ WHERE NOT EXISTS (SELECT 1 FROM projects WHERE title = 'goblox');
 
 INSERT OR IGNORE INTO project_to_stack (project_id, stack_id)
 SELECT p.id, s.id FROM projects p, stack s
-WHERE p.title = 'goblox' AND s.key IN ('Go', 'TypeScript', 'roblox-ts', 'luau', 'TypeTorch');
+WHERE p.title = 'goblox' AND s.key IN ('Go', 'TypeScript', 'roblox-ts', 'luau');
