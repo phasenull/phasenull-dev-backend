@@ -38,3 +38,10 @@ Slime Merge).
 Adds goblox (the Go port of the roblox-ts compiler) and a Go stack, linked to Go, TypeScript, roblox-ts and luau.
 Upload the stack icon to the cdn root first (`go.svg`, from https://go.dev/images/go-logo-blue.svg), run the
 file against the production database, then delete the `projects_all` KV key.
+
+## 2026-11-21-update-typetorch.sql
+
+Rewrites the TypeTorch description for the typetorch.dev docs (live demo link, mobile app, safe deploys, the
+backend explorer), points the project and the TypeTorch stack at typetorch.dev, and puts 8 screenshots from the docs
+(`typetorch_docs_*.png`, from https://www.typetorch.dev/screenshots/) before the older ones. Upload those to
+`uploads/` first, run the file against the production database, then delete the `projects_all` KV key.
